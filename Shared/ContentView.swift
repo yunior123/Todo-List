@@ -8,73 +8,117 @@
 import SwiftUI
 import CoreData
 
+enum Priority: String,Identifiable,CaseIterable{
+    var id: UUID{
+        return UUID()
+    }
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+}
+
+extension Priority {
+    var title: String {
+        switch self {
+        case .low:
+            return "Low"
+        case .medium:
+            return "Medium"
+        case .high:
+            return "High"
+      
+        }
+    }
+}
+
 struct ContentView: View {
+    @State private var title: String = ""
+    @State private var selectedPriority: Priority = .medium
     @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-
+    @FetchRequest(entity:
+                    TodoModel.entity(),
+                  sortDescriptors:
+                    [NSSortDescriptor(key:"dateCreated",ascending: false)
+                    ]
+    ) private var allTodos: FetchedResults<TodoModel>
+    
+    private func styleForPriority(_ value: String) -> Color{
+        let priority = Priority(rawValue: value)
+        
+        switch priority {
+            case .low:
+                return Color.green
+            case .medium:
+                return Color.orange
+            case .high:
+                return Color.black
+        default:
+            return Color.black
+      
+        }
+    }
+    private func saveTodo(){
+        do{
+            let todo = TodoModel(context: viewContext)
+            todo.title = title
+            todo.priority = selectedPriority.rawValue
+            todo.dateCreated=Date()
+            todo.isFavorite=false
+            try viewContext.save()
+        }
+        catch{
+            print(error.localizedDescription)
+        }
+    }
     var body: some View {
-        List {
-            ForEach(items) { item in
-                Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-            }
-            .onDelete(perform: deleteItems)
-        }
-        .toolbar {
-            #if os(iOS)
-            EditButton()
-            #endif
+        NavigationView {
+            VStack{
+                Text("Todo List").font(Font.custom("poppins", size: 20.0))
+                TextField("Enter title", text: $title).textFieldStyle(RoundedBorderTextFieldStyle())                .frame(maxWidth: .infinity, maxHeight: 45)
 
-            Button(action: addItem) {
-                Label("Add Item", systemImage: "plus")
+                Picker("Priority", selection: $selectedPriority){
+                    ForEach (Priority.allCases){
+                        priority in Text(priority.title).tag(priority)
+                    }
+
+                }.pickerStyle(SegmentedPickerStyle())                .frame(maxWidth: .infinity, maxHeight: 45)
+
+                Button("Save"){
+                    saveTodo()
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: 45)
+                .background(Color.blue)
+                .foregroundColor(Color.white)
+                List{
+                    ForEach(allTodos){
+                        todo in
+                        HStack{
+                            Circle()
+                                .fill(styleForPriority(todo.priority!))
+                                .frame(width: 15, height: 15, alignment: .center)
+                            Spacer().frame(width: 20)
+                            Text(todo.title ?? "")
+                        }
+
+
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: 200)
+                Spacer()
             }
+            .padding()
+          
+       
         }
+        
     }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
+}
+struct Content_Previews: PreviewProvider {
+    static var previews: some View{
+        let persistentContainer = CoreDataManager.shared.persistentContainer
+        ContentView()
+            .environment(\.managedObjectContext,persistentContainer.viewContext)
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
-    }
-}
