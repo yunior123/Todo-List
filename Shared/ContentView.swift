@@ -70,6 +70,12 @@ struct ContentView: View {
             print(error.localizedDescription)
         }
     }
+    
+//    private func updateTodo(_ todo: TodoModel){
+//        todo.isFavorite = !todo.isFavorite
+//        viewContext.save()
+//    }
+    
     var body: some View {
         NavigationView {
             VStack{
